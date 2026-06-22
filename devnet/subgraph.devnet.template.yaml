@@ -6,9 +6,10 @@ schema:
 dataSources:
   - kind: ethereum/contract
     name: ZenStaker
+    # Must match the network label configured in graph-node's `ethereum` env.
     network: mainnet
     source:
-      address: "0x3ffB5A325B887A800754779e86E6710Ab52C2b7e"
+      address: "__PROXY_ADDRESS__"
       abi: ZenStaker
       startBlock: 0
     mapping:
