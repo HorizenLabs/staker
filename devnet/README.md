@@ -14,7 +14,12 @@ One `docker compose` that brings up a complete local environment:
 
 The two one-shot jobs are ordered via compose conditions:
 `contracts` waits for anvil to be healthy, and `subgraph-deployer` waits for
-`contracts` to finish successfully **and** for graph-node to start.
+`contracts` to finish successfully **and** for graph-node to start. Both jobs are
+idempotent: on a restart with persisted state they detect the
+already-initialized chain / deployed subgraph and skip, keeping addresses stable.
+
+All state is persisted under `data/` (anvil chain → `data/anvil`, index →
+`data/postgres`, ipfs → `data/ipfs`), so the stack survives stop/restart.
 
 ## Requirements
 
@@ -47,17 +52,47 @@ Find the deployed addresses (token, calculator, impl, proxy) in the logs of the
 `contracts` service, or in
 `broadcast/DeployZenStakerTestnet.s.sol/31337/run-latest.json`.
 
-## Stop / reset
+## Exercise the contracts
+
+The deploy script only **deploys** the `ERC20VotesMock` token — it does **not**
+mint any, so `totalSupply` starts at `0`. Helper scripts to mint test tokens and
+start a reward distribution live in [`test_scripts/`](test_scripts/) — they read
+the deployed addresses from the broadcast file automatically. Quick start:
 
 ```bash
-docker compose down          # stop containers, keep chain + index data
-docker compose down -v       # also remove containers and networks
-rm -rf data/                 # wipe postgres + ipfs state for a clean slate
+cd test_scripts
+./mint.sh                 # mint 10 GOV to the admin (anvil account #3)
+./set-reward.sh           # start a 100 GOV reward over REWARD_DURATION (30d)
 ```
 
-Because anvil state is in-memory, a restart of the `anvil` service produces a
-**fresh chain** — re-run `docker compose up` so the `contracts` and
-`subgraph-deployer` jobs redeploy against it.
+See [`test_scripts/README.md`](test_scripts/README.md) for arguments and options.
+
+## Stop / reset
+
+State (chain, index, ipfs) persists under `data/`, so you can stop and resume
+without losing anything:
+
+```bash
+docker compose stop          # stop containers, keep all state
+docker compose up            # resume where you left off (jobs skip redeploy)
+docker compose down          # remove containers + networks, keep state in data/
+```
+
+`anvil` dumps its state to `data/anvil/anvil-state.json` on shutdown (and every
+5s as a guard) and reloads it on boot; graph-node resumes indexing from the
+persisted postgres data on its own.
+
+For a clean slate, wipe the persisted state (note: the `postgres` dir is
+root-owned, so this needs `sudo`):
+
+```bash
+docker compose down
+sudo rm -rf data/            # wipe anvil chain + postgres + ipfs state
+```
+
+Wipe all-or-nothing — removing only part of `data/` leaves the subgraph indexing
+a chain that no longer matches. (`docker compose down -v` removes named volumes
+only; it does **not** touch the `data/` bind mounts.)
 
 ## Notes
 

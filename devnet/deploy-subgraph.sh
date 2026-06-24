@@ -9,6 +9,30 @@ TEMPLATE="/repo/devnet/subgraph.devnet.template.yaml"
 MANIFEST="subgraph.devnet.yaml"
 SUBGRAPH_NAME="zen-staker"
 
+GRAPH_NODE_STATUS="http://graph-node:8030/graphql"
+
+# Idempotency: graph-node + postgres persist across restarts and resume
+# indexing on their own. If the subgraph is already deployed, skip.
+echo "[subgraph] waiting for graph-node status endpoint at ${GRAPH_NODE_STATUS} ..."
+until node -e 'fetch(process.argv[1]).then(()=>process.exit(0)).catch(()=>process.exit(1))' "${GRAPH_NODE_STATUS}" 2>/dev/null; do
+  sleep 2
+done
+ALREADY=$(node -e '
+  fetch(process.argv[1], {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query: "{ indexingStatusForCurrentVersion(subgraphName: \"" + process.argv[2] + "\", pending: false) { synced health } }" }),
+  })
+    .then(r => r.json())
+    .then(j => { const s = j && j.data && j.data.indexingStatusForCurrentVersion; process.stdout.write(s ? "yes" : "no"); })
+    .catch(() => process.stdout.write("no"));
+' "${GRAPH_NODE_STATUS}" "${SUBGRAPH_NAME}")
+if [ "${ALREADY}" = "yes" ]; then
+  echo "[subgraph] ${SUBGRAPH_NAME} already deployed on graph-node, skipping (resumed from persisted state)."
+  echo "[subgraph] GraphQL: http://localhost:8000/subgraphs/name/${SUBGRAPH_NAME}"
+  exit 0
+fi
+
 echo "[subgraph] reading proxy address from broadcast..."
 PROXY_ADDRESS=$(node -e '
   const t = require(process.argv[1]).transactions;
