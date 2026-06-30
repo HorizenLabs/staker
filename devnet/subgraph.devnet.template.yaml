@@ -24,6 +24,7 @@ dataSources:
         - DelegateeAlteredEvent
         - ClaimerAlteredEvent
         - RewardNotifiedEvent
+        - Activity
       abis:
         - name: ZenStaker
           file: ./abis/ZenStaker.json
