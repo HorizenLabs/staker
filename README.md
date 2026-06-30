@@ -159,29 +159,59 @@ forge test
 
 ### End-to-end script
 
-The e2e script deploys the full contract stack and exercises the entire staking lifecycle (stake → accrue rewards → claim → withdraw).
+The e2e scripts deploy the contract stack and exercise the entire staking lifecycle (stake → accrue rewards → claim → withdraw).
 
+#### Upgradeable variant (ZenStakerUpgradeable)
 **Against a local Anvil node (no .env needed):**
-
 ```bash
 npm install
 npm run e2e:anvil
-# or: npm run e2e -- --anvil 9545   (custom port)
 ```
 
 **Against a testnet:**
-
 ```bash
 cp .env.template .env
 # fill in: RPC_URL, DEPLOYER_PRIVATE_KEY, USER1_PRIVATE_KEY, USER2_PRIVATE_KEY
 npm run e2e
 ```
 
+#### Non-upgradeable variant (ZenStaker)
+**Against a local Anvil node (no .env needed):**
+```bash
+npm run e2e:staker:anvil
+```
+
+**Against a testnet:**
+```bash
+cp .env.template .env
+# fill in: RPC_URL, DEPLOYER_PRIVATE_KEY, USER1_PRIVATE_KEY, USER2_PRIVATE_KEY
+npm run e2e:staker
+```
+
 ### Deployment (Foundry)
 
+To deploy the **non-upgradeable** `ZenStaker` implementation using Foundry, you will use the provided scripts in the `script/` directory.
+
+#### 1. Deploy ZenStaker & IdentityEarningPowerCalculator
+Export the following environment variables (or set them in `.env`):
+* `ZEN_TOKEN_ADDRESS`: Address of the deployed ZEN ERC20 token.
+* `ADMIN_ADDRESS`: Address of the Horizen multisig (becomes staker admin).
+* `PRIVATE_KEY`: Deployer private key (hex, with or without 0x prefix).
+* `MAX_BUMP_TIP` (Optional): Maximum bump tip (defaults to 0).
+
+Execute the deploy script:
 ```bash
-# Set env vars: see .env.template
 forge script script/DeployZenStaker.s.sol --rpc-url $RPC_URL --broadcast
+```
+
+#### 2. Configure Reward Notifiers (Post-Deploy)
+To authorize a contract or account to send rewards to the staker, export these variables:
+* `STAKER_ADDRESS`: Address of the deployed `ZenStaker` contract.
+* `REWARD_NOTIFIER_ADDRESS`: Address of the reward notifier to enable.
+* `PRIVATE_KEY`: Admin private key (must be the `ADMIN_ADDRESS` specified during deploy).
+
+Execute the configuration script:
+```bash
 forge script script/ConfigureRewardNotifier.s.sol --rpc-url $RPC_URL --broadcast
 ```
 

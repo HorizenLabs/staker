@@ -24,20 +24,18 @@ contract ZenStaker is Staker, StakerPermitAndStake {
   /// @notice Maps each delegatee address to its non-voting delegation surrogate contract.
   mapping(address delegatee => DelegationSurrogate surrogate) private _surrogates;
 
-  /// @param _rewardToken ZEN token address (reward token).
-  /// @param _stakeToken ZEN token address (stake token — same as reward for ZEN-on-ZEN staking).
+  /// @param _token ZEN token address (used as both reward and stake token — ZEN-on-ZEN staking).
   /// @param _earningPowerCalculator Earning power calculator (use IdentityEarningPowerCalculator).
   /// @param _maxBumpTip Maximum tip a bumper may request (0 — bumping disabled in Phase 1).
   /// @param _admin Horizen multisig address.
   constructor(
-    IERC20 _rewardToken,
-    IERC20 _stakeToken,
+    IERC20 _token,
     IEarningPowerCalculator _earningPowerCalculator,
     uint256 _maxBumpTip,
     address _admin
   )
-    Staker(_rewardToken, _stakeToken, _earningPowerCalculator, _maxBumpTip, _admin)
-    StakerPermitAndStake(IERC20Permit(address(_stakeToken)))
+    Staker(_token, _token, _earningPowerCalculator, _maxBumpTip, _admin)
+    StakerPermitAndStake(IERC20Permit(address(_token)))
   {
     MAX_CLAIM_FEE = 0;
     _setClaimFeeParameters(ClaimFeeParameters({feeAmount: 0, feeCollector: address(0)}));
