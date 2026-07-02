@@ -148,11 +148,11 @@ contract ZenStaker is Staker, StakerPermitAndStake {
     totalEarningPower_ = depositorTotalEarningPower[_depositor];
   }
 
-  /// @notice Returns voting power as aggregated staking totals plus total unclaimed rewards for a depositor in one call.
+  /// @notice Returns voting power as staking totals for a depositor
   /// @param account The address to query.
   function getVotes(address account) public view returns (uint256) {
-    (uint256 totalStaked, uint256 totalEarningPower) = getDepositorSummary(account);
-    return totalStaked + totalEarningPower;
+    (uint256 totalStaked,) = getDepositorSummary(account);
+    return totalStaked;
   }
 
   /// @notice Returns aggregated staking totals plus total unclaimed rewards for a depositor in
