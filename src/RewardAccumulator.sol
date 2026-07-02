@@ -19,6 +19,7 @@ contract RewardAccumulator is Ownable {
 
     error NotWhitelisted();
     error WaitForNextRewardTime(uint256 nextRewardTime);
+    error TransferDontFound();
 
     modifier onlyWhitelisted() {
         if (whitelistEnabled && !whitelist[msg.sender]) {
@@ -57,6 +58,16 @@ contract RewardAccumulator is Ownable {
     function transferAndNotifyRewards(uint256 amount) external onlyWhitelisted {
         // transfer tokens in this contract
         SafeERC20.safeTransferFrom(rewardToken, msg.sender, address(this), amount);
+        // update accumulated rewards
+        accumulatedRewards += amount;
+    }
+
+    //invoke this method after safeTransferFrom if you prefer to transfer them manually and then notify the contract - use the same exact amount as the one you transferred to the contract
+    function notifyRewardsAlreadyTransferred(uint256 amount) external onlyWhitelisted {
+        // check that the amount transferred in is equal to the amount specified
+        if (rewardToken.balanceOf(address(this)) - accumulatedRewards != amount) {
+            revert TransferDontFound();
+        }
         // update accumulated rewards
         accumulatedRewards += amount;
     }
