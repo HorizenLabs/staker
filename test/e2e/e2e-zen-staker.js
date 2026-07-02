@@ -69,6 +69,8 @@ const TOP_UP_AMOUNT   = ethers.parseEther("0.005");
 
 const INITIAL_MINT     = ethers.parseEther("100000"); // minted to each user
 const REWARD_AMOUNT    = ethers.parseEther("86400");  // 86 400 ZEN -> ~1 ZEN/s over 30 days
+const ACCUMULATOR_REWARD_AMOUNT = ethers.parseEther("86400");
+const REWARD_WINDOW_SECONDS = 30 * 24 * 60 * 60;
 const USER1_STAKE      = ethers.parseEther("1000");
 const USER2_STAKE      = ethers.parseEther("500");
 const USER1_STAKE_MORE = ethers.parseEther("500");
@@ -295,6 +297,7 @@ async function run() {
   const mockTokenArtifact  = loadArtifact("MockERC20Votes.sol", "ERC20VotesMock");
   const calculatorArtifact = loadArtifact("IdentityEarningPowerCalculator.sol", "IdentityEarningPowerCalculator");
   const zenStakerArtifact  = loadArtifact("ZenStaker.sol", "ZenStaker");
+  const rewardAccumulatorArtifact = loadArtifact("RewardAccumulator.sol", "RewardAccumulator");
 
   // -- 1: ETH Balance Check & Top-Up ------------------------------------------
   section("1 - ETH Balance Check & Top-Up");
@@ -395,13 +398,29 @@ async function run() {
   assert(await staker.REWARD_TOKEN() === await staker.STAKE_TOKEN(), "REWARD_TOKEN == STAKE_TOKEN (ZEN-on-ZEN enforced)");
   assert(await staker.admin()        === deployer.address,            "admin == deployer");
 
-  // -- 5: Configure Reward Notifier --------------------------------------------
-  section("5 - Configure Reward Notifier (deployer as direct notifier)");
+  // -- 5: Deploy RewardAccumulator and configure it as the sole reward notifier ---
+  section("5 - Deploy RewardAccumulator and configure it as the sole reward notifier");
 
-  const setNotifierTx = await staker.connect(deployer).setRewardNotifier(deployer.address, true);
+  const accumulatorFactory = new ethers.ContractFactory(
+    rewardAccumulatorArtifact.abi, rewardAccumulatorArtifact.bytecode, deployer
+  );
+  const accumulatorContract = await accumulatorFactory.deploy(
+    stakerAddress,
+    await zenToken.getAddress(),
+    REWARD_WINDOW_SECONDS,
+    false,
+    BigInt(Math.floor(Date.now() / 1000)) + BigInt(REWARD_WINDOW_SECONDS)
+  );
+  const accumulatorReceipt = await accumulatorContract.deploymentTransaction().wait();
+  const accumulatorAddress = await accumulatorContract.getAddress();
+  logTx("Deploy RewardAccumulator", accumulatorContract.deploymentTransaction(), accumulatorReceipt);
+  console.log(`  Contract : ${accumulatorAddress}`);
+
+  const setNotifierTx = await staker.connect(deployer).setRewardNotifier(accumulatorAddress, true);
   const setNotifierRx = await setNotifierTx.wait();
-  logTx("setRewardNotifier(deployer, true)", setNotifierTx, setNotifierRx);
-  assert(await staker.isRewardNotifier(deployer.address), "deployer is reward notifier");
+  logTx("setRewardNotifier(accumulator, true)", setNotifierTx, setNotifierRx);
+  assert(await staker.isRewardNotifier(accumulatorAddress), "reward accumulator is reward notifier");
+  assert(!(await staker.isRewardNotifier(deployer.address)), "deployer is not reward notifier");
 
   await printGlobalState(staker, "after setup, before any stakes");
 
@@ -467,21 +486,36 @@ async function run() {
   assert(batchBal[0] === USER1_STAKE, "batch: deposit1 balance correct");
   assert(batchBal[1] === USER2_STAKE, "batch: deposit2 balance correct");
 
-  // -- 8: Distribute rewards ----------------------------------------------------
-  section("8 - Distribute rewards via notifyRewardAmount");
+  // -- 8: Fund accumulator and let it flush rewards to ZenStaker at the end of the window ---
+  section("8 - Fund RewardAccumulator and release rewards to ZenStaker");
 
-  const transferRwdTx = await zenToken.connect(deployer).transfer(await staker.getAddress(), REWARD_AMOUNT);
-  const transferRwdRx = await transferRwdTx.wait();
-  logTx(`Transfer ${ethers.formatEther(REWARD_AMOUNT)} ZEN to staker`, transferRwdTx, transferRwdRx);
+  const mintAccumulatorTx = await zenToken.connect(deployer).mint(deployer.address, ACCUMULATOR_REWARD_AMOUNT);
+  const mintAccumulatorRx = await mintAccumulatorTx.wait();
+  logTx(`Mint ${ethers.formatEther(ACCUMULATOR_REWARD_AMOUNT)} ZEN to deployer`, mintAccumulatorTx, mintAccumulatorRx);
 
-  const notifyTx = await staker.connect(deployer).notifyRewardAmount(REWARD_AMOUNT);
-  const notifyRx = await notifyTx.wait();
-  logTx(`notifyRewardAmount(${ethers.formatEther(REWARD_AMOUNT)} ZEN)`, notifyTx, notifyRx);
+  const approveAccumulatorTx = await zenToken.connect(deployer).approve(accumulatorAddress, ACCUMULATOR_REWARD_AMOUNT);
+  const approveAccumulatorRx = await approveAccumulatorTx.wait();
+  logTx("Approve RewardAccumulator to pull reward tokens", approveAccumulatorTx, approveAccumulatorRx);
 
-  const gsRewards = await printGlobalState(staker, "after notifyRewardAmount");
-  assert(gsRewards.rewardRate    > 0n, "rewardRate > 0 after notification");
+  const transferToAccumulatorTx = await accumulatorContract.connect(deployer).transferAndNotifyRewards(ACCUMULATOR_REWARD_AMOUNT);
+  const transferToAccumulatorRx = await transferToAccumulatorTx.wait();
+  logTx("Transfer rewards into RewardAccumulator", transferToAccumulatorTx, transferToAccumulatorRx);
+
+  const gsRewardsBeforeFlush = await printGlobalState(staker, "before reward window flush");
+  assert(gsRewardsBeforeFlush.rewardRate === 0n, "rewardRate remains 0 before accumulator flush");
+
+  if (USE_ANVIL) {
+    await advanceTime(provider, REWARD_WINDOW_SECONDS);
+  }
+
+  const flushTx = await accumulatorContract.connect(deployer).sendRewardsToStaker();
+  const flushRx = await flushTx.wait();
+  logTx("RewardAccumulator flushes rewards into ZenStaker", flushTx, flushRx);
+
+  const gsRewards = await printGlobalState(staker, "after reward window flush");
+  assert(gsRewards.rewardRate    > 0n, "rewardRate > 0 after accumulator flush");
   assert(gsRewards.rewardEndTime > 0n, "rewardEndTime set");
-  console.log(`\n  Expected rate ~${ethers.formatEther(REWARD_AMOUNT / (30n * 86400n))} ZEN/s`);
+  console.log(`\n  Expected rate ~${ethers.formatEther(ACCUMULATOR_REWARD_AMOUNT / (30n * 86400n))} ZEN/s`);
   console.log(`  Actual   rate  ${ethers.formatEther(gsRewards.rewardRate)} ZEN/s`);
 
   // -- 9: Let rewards accrue ----------------------------------------------------

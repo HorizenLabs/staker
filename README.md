@@ -161,23 +161,10 @@ forge test
 
 The e2e scripts deploy the contract stack and exercise the entire staking lifecycle (stake → accrue rewards → claim → withdraw).
 
-#### Upgradeable variant (ZenStakerUpgradeable)
-**Against a local Anvil node (no .env needed):**
-```bash
-npm install
-npm run e2e:anvil
-```
-
-**Against a testnet:**
-```bash
-cp .env.template .env
-# fill in: RPC_URL, DEPLOYER_PRIVATE_KEY, USER1_PRIVATE_KEY, USER2_PRIVATE_KEY
-npm run e2e
-```
-
 #### Non-upgradeable variant (ZenStaker)
 **Against a local Anvil node (no .env needed):**
 ```bash
+npm install
 npm run e2e:staker:anvil
 ```
 
