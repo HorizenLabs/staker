@@ -8,7 +8,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract RewardAccumulator is Ownable {
 
-    uint256 public constant MAX_TIME_WINDOW = 60 days;
+    uint256 public constant MAX_TIME_WINDOW = 90 days;
 
     Staker public immutable staker;
     ERC20 public immutable rewardToken;
