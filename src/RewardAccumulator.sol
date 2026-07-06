@@ -8,6 +8,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract RewardAccumulator is Ownable {
 
+    uint256 public constant MAX_TIME_WINDOW = 60 days;
+
     Staker public immutable staker;
     ERC20 public immutable rewardToken;
 
@@ -20,6 +22,7 @@ contract RewardAccumulator is Ownable {
     error NotWhitelisted();
     error WaitForNextRewardTime(uint256 nextRewardTime);
     error TransferDontFound();
+    error TimeWindowTooLarge();
 
     modifier onlyWhitelisted() {
         if (whitelistEnabled && !whitelist[msg.sender]) {
@@ -29,6 +32,10 @@ contract RewardAccumulator is Ownable {
     }
     
     constructor(Staker _staker, ERC20 _rewardToken, uint256 _timeWindow, bool _whitelistEnabled) Ownable(msg.sender) {
+        if (_timeWindow > MAX_TIME_WINDOW) {
+            revert TimeWindowTooLarge();
+        }
+        
         staker = _staker;
         rewardToken = _rewardToken;
         timeWindow = _timeWindow;
@@ -38,6 +45,9 @@ contract RewardAccumulator is Ownable {
 
     // Admin functions
     function setTimeWindow(uint256 _timeWindow) external onlyOwner {
+        if (_timeWindow > MAX_TIME_WINDOW) {
+            revert TimeWindowTooLarge();
+        }
         timeWindow = _timeWindow;
     }
 
@@ -63,9 +73,9 @@ contract RewardAccumulator is Ownable {
     }
 
     //invoke this method after safeTransferFrom if you prefer to transfer them manually and then notify the contract - use the same exact amount as the one you transferred to the contract
-    function notifyRewardsAlreadyTransferred(uint256 amount) external onlyWhitelisted {
+    function notifyAlreadyTransferredRewards(uint256 amount) external onlyWhitelisted {
         // check that the amount transferred in is equal to the amount specified
-        if (rewardToken.balanceOf(address(this)) - accumulatedRewards != amount) {
+        if (rewardToken.balanceOf(address(this)) - accumulatedRewards < amount) {
             revert TransferDontFound();
         }
         // update accumulated rewards
@@ -79,12 +89,14 @@ contract RewardAccumulator is Ownable {
 
         uint256 rewardAmount = accumulatedRewards;
 
-        // transfer accumulated rewards to staker
-        SafeERC20.safeTransfer(rewardToken, address(staker), rewardAmount);
-        // notify the staker that rewards were transferred in
-        staker.notifyRewardAmount(rewardAmount);
-        // reset accumulated rewards
-        accumulatedRewards = 0;
+        if (rewardAmount > 0) {
+            // transfer accumulated rewards to staker
+            SafeERC20.safeTransfer(rewardToken, address(staker), rewardAmount);
+            // notify the staker that rewards were transferred in
+            staker.notifyRewardAmount(rewardAmount);
+            // reset accumulated rewards
+            accumulatedRewards = 0;
+        }
         // update last reward time
         lastRewardTime += timeWindow;
     }
