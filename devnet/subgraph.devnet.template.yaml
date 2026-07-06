@@ -9,7 +9,7 @@ dataSources:
     # Must match the network label configured in graph-node's `ethereum` env.
     network: mainnet
     source:
-      address: "__PROXY_ADDRESS__"
+      address: "__STAKER_ADDRESS__"
       abi: ZenStaker
       startBlock: 0
     mapping:

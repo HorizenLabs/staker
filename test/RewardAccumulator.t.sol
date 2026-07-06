@@ -84,12 +84,36 @@ contract RewardAccumulatorTest is Test {
 
         uint256 previousNextRewardTime = accumulator.nextRewardTime();
 
+        // 2 days elapse for a 1-day timeWindow, i.e. exactly 2 windows.
         vm.warp(block.timestamp + 2 days);
         accumulator.sendRewardsToStaker();
 
         assertEq(rewardToken.balanceOf(address(mockStaker)), amount);
         assertEq(mockStaker.lastNotifiedAmount(), amount);
         assertEq(accumulator.accumulatedRewards(), 0);
-        assertEq(accumulator.nextRewardTime(), previousNextRewardTime + 1 days);
+        // lastRewardTime catches up by the number of windows that actually elapsed (2),
+        // not by a single fixed timeWindow, so nextRewardTime lands on the schedule grid.
+        assertEq(accumulator.nextRewardTime(), previousNextRewardTime + 2 days);
+    }
+
+    function test_sendRewardsToStaker_catchesUpMultipleIdleWindowsInOneCall() public {
+        // No rewards ever accumulated - just prove the time bookkeeping catches up to the
+        // schedule grid instead of advancing by a single timeWindow per call, which would
+        // otherwise let a permissionless caller call sendRewardsToStaker() N+1 times
+        // back-to-back after N idle windows.
+        uint256 initialLastRewardTime = accumulator.lastRewardTime();
+
+        vm.warp(block.timestamp + 3 days);
+        accumulator.sendRewardsToStaker();
+
+        assertEq(accumulator.lastRewardTime(), initialLastRewardTime + 3 days);
+        assertEq(accumulator.nextRewardTime(), initialLastRewardTime + 4 days);
+
+        // A second call in the same block now correctly reverts - the window has not
+        // elapsed again - instead of succeeding as it would with naive `+= timeWindow`.
+        vm.expectRevert(
+            abi.encodeWithSelector(RewardAccumulator.WaitForNextRewardTime.selector, accumulator.nextRewardTime())
+        );
+        accumulator.sendRewardsToStaker();
     }
 }

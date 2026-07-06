@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reads the deployed ZenStaker proxy address from the forge broadcast file,
+# Reads the deployed ZenStaker address from the forge broadcast file,
 # generates a devnet subgraph manifest and deploys it to the local graph-node.
 # Runs inside a node image. Working dir: /repo/subgraphs.
 set -euo pipefail
@@ -13,17 +13,17 @@ SUBGRAPH_NAME="zen-staker"
 # hash) into a near-noop and creates a fresh deployment when the schema/mapping
 # change, so this correctly picks up subgraph edits across restarts. The
 # persisted postgres index is reused for unchanged code and reindexed for new.
-echo "[subgraph] reading proxy address from broadcast..."
-PROXY_ADDRESS=$(node -e '
+echo "[subgraph] reading ZenStaker address from broadcast..."
+STAKER_ADDRESS=$(node -e '
   const t = require(process.argv[1]).transactions;
-  const proxy = t.filter(x => x.contractName === "ERC1967Proxy").pop();
-  if (!proxy) { console.error("ERC1967Proxy not found in broadcast"); process.exit(1); }
-  process.stdout.write(proxy.contractAddress);
+  const staker = t.filter(x => x.contractName === "ZenStaker").pop();
+  if (!staker) { console.error("ZenStaker not found in broadcast"); process.exit(1); }
+  process.stdout.write(staker.contractAddress);
 ' "${BROADCAST}")
-echo "[subgraph] ZenStaker proxy: ${PROXY_ADDRESS}"
+echo "[subgraph] ZenStaker: ${STAKER_ADDRESS}"
 
 # Generate the manifest with the freshly deployed address.
-sed "s|__PROXY_ADDRESS__|${PROXY_ADDRESS}|g" "${TEMPLATE}" > "${MANIFEST}"
+sed "s|__STAKER_ADDRESS__|${STAKER_ADDRESS}|g" "${TEMPLATE}" > "${MANIFEST}"
 
 # node_modules is mounted from the host; install only if missing.
 if [ ! -x "./node_modules/.bin/graph" ]; then

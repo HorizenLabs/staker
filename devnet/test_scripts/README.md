@@ -10,7 +10,7 @@ Requires `cast` (Foundry) and one of `jq` / `python3` / `node` on the host.
 | Script           | What it does                                                        |
 | ---------------- | ------------------------------------------------------------------- |
 | `mint.sh`        | Public-mint GOV test tokens to an address.                          |
-| `set-reward.sh`  | Authorize notifier → fund proxy → `notifyRewardAmount` (30d window). |
+| `set-reward.sh`  | Authorize notifier → fund staker → `notifyRewardAmount` (30d window). |
 
 ## Usage
 

@@ -5,10 +5,10 @@ One `docker compose` that brings up a complete local environment:
 1. **anvil** — local EVM node (chain id `31337`) on `:8545`
 2. **contracts** — one-shot job that deploys the stack with
    `script/DeployZenStakerTestnet.s.sol` (test ERC20 + IdentityEarningPowerCalculator
-   + `ZenStakerUpgradeable` impl + ERC1967 proxy)
+   + `ZenStaker`, deployed directly, no proxy)
 3. **postgres + ipfs** — graph-node backing services
 4. **graph-node** — indexer, pointed at anvil
-5. **subgraph-deployer** — one-shot job that reads the freshly deployed proxy
+5. **subgraph-deployer** — one-shot job that reads the freshly deployed ZenStaker
    address from the forge broadcast file, generates `subgraph.devnet.yaml` and
    deploys the subgraph to the local graph-node
 
@@ -48,7 +48,7 @@ When everything is up:
 | GraphQL          | http://localhost:8000/subgraphs/name/zen-staker       |
 | Graph admin RPC  | http://localhost:8020                                 |
 
-Find the deployed addresses (token, calculator, impl, proxy) in the logs of the
+Find the deployed addresses (token, calculator, staker) in the logs of the
 `contracts` service, or in
 `broadcast/DeployZenStakerTestnet.s.sol/31337/run-latest.json`.
 

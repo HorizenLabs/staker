@@ -5,7 +5,7 @@ name: zenstaker-devnet
 #   2. contracts           -> deploys via script/DeployZenStakerTestnet.s.sol (one-shot)
 #   3. postgres + ipfs     -> graph-node backing services
 #   4. graph-node          -> indexer, pointed at anvil
-#   5. subgraph-deployer   -> reads the deployed proxy address and deploys the subgraph (one-shot)
+#   5. subgraph-deployer   -> reads the deployed ZenStaker address and deploys the subgraph (one-shot)
 #
 # State persistence:
 #   All state is persisted to ./data (bind mounts):

@@ -408,8 +408,7 @@ async function run() {
     stakerAddress,
     await zenToken.getAddress(),
     REWARD_WINDOW_SECONDS,
-    false,
-    BigInt(Math.floor(Date.now() / 1000)) + BigInt(REWARD_WINDOW_SECONDS)
+    false
   );
   const accumulatorReceipt = await accumulatorContract.deploymentTransaction().wait();
   const accumulatorAddress = await accumulatorContract.getAddress();
@@ -420,7 +419,14 @@ async function run() {
   const setNotifierRx = await setNotifierTx.wait();
   logTx("setRewardNotifier(accumulator, true)", setNotifierTx, setNotifierRx);
   assert(await staker.isRewardNotifier(accumulatorAddress), "reward accumulator is reward notifier");
-  assert(!(await staker.isRewardNotifier(deployer.address)), "deployer is not reward notifier");
+
+  // The deployer is also authorized directly so it can cover the very first
+  // reward window itself, mirroring the real deployment procedure: the
+  // accumulator only takes over starting from the second window onward.
+  const setDeployerNotifierTx = await staker.connect(deployer).setRewardNotifier(deployer.address, true);
+  const setDeployerNotifierRx = await setDeployerNotifierTx.wait();
+  logTx("setRewardNotifier(deployer, true)", setDeployerNotifierTx, setDeployerNotifierRx);
+  assert(await staker.isRewardNotifier(deployer.address), "deployer is reward notifier (covers first window)");
 
   await printGlobalState(staker, "after setup, before any stakes");
 
@@ -486,9 +492,25 @@ async function run() {
   assert(batchBal[0] === USER1_STAKE, "batch: deposit1 balance correct");
   assert(batchBal[1] === USER2_STAKE, "batch: deposit2 balance correct");
 
-  // -- 8: Fund accumulator and let it flush rewards to ZenStaker at the end of the window ---
-  section("8 - Fund RewardAccumulator and release rewards to ZenStaker");
+  // -- 8: Notify the first reward window directly, then fund RewardAccumulator for the next one ---
+  section("8 - Notify first reward window directly, fund RewardAccumulator for the next one");
 
+  // Mirrors the real deployment procedure: the very first reward window is sent
+  // directly to the staker (bypassing the accumulator) so stakers start earning
+  // immediately, instead of waiting for a full `timeWindow` to elapse before the
+  // accumulator can flush anything.
+  const transferFirstRewardTx = await zenToken.connect(deployer).transfer(stakerAddress, REWARD_AMOUNT);
+  const transferFirstRewardRx = await transferFirstRewardTx.wait();
+  logTx(`Transfer ${ethers.formatEther(REWARD_AMOUNT)} ZEN directly to ZenStaker (first window)`, transferFirstRewardTx, transferFirstRewardRx);
+
+  const notifyFirstTx = await staker.connect(deployer).notifyRewardAmount(REWARD_AMOUNT);
+  const notifyFirstRx = await notifyFirstTx.wait();
+  logTx("notifyRewardAmount(first window)", notifyFirstTx, notifyFirstRx);
+
+  const gsFirstWindow = await printGlobalState(staker, "after first-window direct notify");
+  assert(gsFirstWindow.rewardRate > 0n, "rewardRate > 0 after first-window direct notify");
+
+  // Fund RewardAccumulator for the *next* window, exactly as ops will do going forward.
   const mintAccumulatorTx = await zenToken.connect(deployer).mint(deployer.address, ACCUMULATOR_REWARD_AMOUNT);
   const mintAccumulatorRx = await mintAccumulatorTx.wait();
   logTx(`Mint ${ethers.formatEther(ACCUMULATOR_REWARD_AMOUNT)} ZEN to deployer`, mintAccumulatorTx, mintAccumulatorRx);
@@ -501,22 +523,26 @@ async function run() {
   const transferToAccumulatorRx = await transferToAccumulatorTx.wait();
   logTx("Transfer rewards into RewardAccumulator", transferToAccumulatorTx, transferToAccumulatorRx);
 
-  const gsRewardsBeforeFlush = await printGlobalState(staker, "before reward window flush");
-  assert(gsRewardsBeforeFlush.rewardRate === 0n, "rewardRate remains 0 before accumulator flush");
-
   if (USE_ANVIL) {
+    // Only on Anvil can we fast-forward past the window to prove the flush
+    // works end-to-end. On a real testnet the window hasn't elapsed yet, and
+    // sendRewardsToStaker() would legitimately revert with WaitForNextRewardTime
+    // - the funds simply stay accumulated until the real window elapses.
     await advanceTime(provider, REWARD_WINDOW_SECONDS);
+
+    const flushTx = await accumulatorContract.connect(deployer).sendRewardsToStaker();
+    const flushRx = await flushTx.wait();
+    logTx("RewardAccumulator flushes rewards into ZenStaker (next window)", flushTx, flushRx);
+
+    const gsRewards = await printGlobalState(staker, "after reward window flush");
+    assert(gsRewards.rewardRate    > 0n, "rewardRate > 0 after accumulator flush");
+    assert(gsRewards.rewardEndTime > 0n, "rewardEndTime set");
+    console.log(`\n  Expected rate ~${ethers.formatEther(ACCUMULATOR_REWARD_AMOUNT / (30n * 86400n))} ZEN/s`);
+    console.log(`  Actual   rate  ${ethers.formatEther(gsRewards.rewardRate)} ZEN/s`);
+  } else {
+    console.log("\n  Testnet mode: skipping accumulator flush - the window hasn't elapsed yet;");
+    console.log("  funds remain accumulated until the real cadence completes it.");
   }
-
-  const flushTx = await accumulatorContract.connect(deployer).sendRewardsToStaker();
-  const flushRx = await flushTx.wait();
-  logTx("RewardAccumulator flushes rewards into ZenStaker", flushTx, flushRx);
-
-  const gsRewards = await printGlobalState(staker, "after reward window flush");
-  assert(gsRewards.rewardRate    > 0n, "rewardRate > 0 after accumulator flush");
-  assert(gsRewards.rewardEndTime > 0n, "rewardEndTime set");
-  console.log(`\n  Expected rate ~${ethers.formatEther(ACCUMULATOR_REWARD_AMOUNT / (30n * 86400n))} ZEN/s`);
-  console.log(`  Actual   rate  ${ethers.formatEther(gsRewards.rewardRate)} ZEN/s`);
 
   // -- 9: Let rewards accrue ----------------------------------------------------
   section("9 - Let rewards accrue");

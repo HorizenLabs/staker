@@ -72,9 +72,9 @@ if (t) console.log(t.contractAddress || "");
 }
 
 TOKEN="$(contract_address ERC20VotesMock)"
-PROXY="$(contract_address ERC1967Proxy)"
+STAKER="$(contract_address ZenStaker)"
 
 [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ] \
   || { echo "error: could not resolve token (ERC20VotesMock) address from broadcast" >&2; exit 1; }
-[ -n "$PROXY" ] && [ "$PROXY" != "null" ] \
-  || { echo "error: could not resolve proxy (ERC1967Proxy) address from broadcast" >&2; exit 1; }
+[ -n "$STAKER" ] && [ "$STAKER" != "null" ] \
+  || { echo "error: could not resolve staker (ZenStaker) address from broadcast" >&2; exit 1; }

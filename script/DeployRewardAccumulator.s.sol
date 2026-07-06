@@ -15,7 +15,6 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 /// Optional:
 ///   TIME_WINDOW         — uint256, defaults to 1 days
 ///   WHITELIST_ENABLED   — bool, defaults to false
-///   NEXT_REWARD_TIME    — uint256, defaults to current block timestamp
 contract DeployRewardAccumulator is Script {
     function run() external returns (RewardAccumulator accumulator) {
         address stakerAddress = vm.envAddress("STAKER_ADDRESS");

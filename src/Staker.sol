@@ -257,10 +257,6 @@ abstract contract Staker is INotifiableRewardReceiver, Multicall {
   /// @notice Current configuration parameters for the fee assessed on claiming.
   ClaimFeeParameters public claimFeeParameters;
 
-  /// @notice Reserved storage slots for future upgrades.
-  /// @dev New state variables should be appended after this gap to preserve storage layout.
-  uint256[50] private __gap;
-
   /// @param _rewardToken ERC20 token in which rewards will be denominated.
   /// @param _stakeToken Delegable governance token which users will stake to earn rewards.
   /// @param _earningPowerCalculator The contract that will serve as the initial calculator of
