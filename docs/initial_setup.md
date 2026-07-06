@@ -24,7 +24,7 @@ We added this because we want the reward window intervals to be fixed: entities 
 Funding functions (both optionally restricted to whitelisted addresses):
 
 - `transferAndNotifyRewards(amount)` — pulls `amount` of ZEN from the caller (requires prior ERC20 approval) and records it in `accumulatedRewards`.
-- `notifyRewardsAlreadyTransferred(amount)` — records tokens that were already transferred to the accumulator manually. The `amount` must match exactly the tokens transferred since the last accounting update.
+- `notifyAlreadyTransferredRewards(amount)` — records tokens that were already transferred to the accumulator manually. The `amount` must not exceed the tokens transferred since the last accounting update.
 
 Configuration functions (owner-only, `Ownable`): `setTimeWindow`, `setWhitelistEnabled`, `setWhitelist(address, bool)`.
 
@@ -58,7 +58,7 @@ Steps:
 
 Steady state:
 
-- During each window, the Foundation and partners deposit rewards into the accumulator (`approve` + `transferAndNotifyRewards(amount)`, or manual transfer + `notifyRewardsAlreadyTransferred(amount)`).
+- During each window, the Foundation and partners deposit rewards into the accumulator (`approve` + `transferAndNotifyRewards(amount)`, or manual transfer + `notifyAlreadyTransferredRewards(amount)`).
 - When the window elapses, anyone (typically an infra keeper/cron) calls `sendRewardsToStaker()` on the accumulator.
 - The staker spreads each batch over the following WINDOW.
 - If needed later, the multisig can enable the accumulator whitelist (`setWhitelistEnabled(true)` + `setWhitelist(entity, true)`) to restrict who can fund rewards on the accumulator.

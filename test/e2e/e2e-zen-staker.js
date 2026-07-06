@@ -18,7 +18,7 @@
  *
  * -- Testnet mode (default) ------------------------------------------------
  *   cp .env.template .env   # fill in keys + RPC
- *   npm run e2e:non-upgradeable
+ *   npm run e2e
  *
  *   Required .env vars:
  *     RPC_URL               testnet JSON-RPC endpoint
@@ -27,9 +27,9 @@
  *     USER2_PRIVATE_KEY
  *
  * -- Anvil mode ------------------------------------------------------------
- *   npm run e2e:non-upgradeable -- --anvil           (spawns anvil on default port 8545)
- *   npm run e2e:non-upgradeable -- --anvil 9545      (custom port)
- *   USE_ANVIL=true npm run e2e:non-upgradeable       (env var alternative)
+ *   npm run e2e:anvil                                (spawns anvil on default port 8545)
+ *   node test/e2e/e2e-zen-staker.js --anvil 9545      (custom port)
+ *   USE_ANVIL=true npm run e2e                        (env var alternative)
  *
  *   Requires Foundry installed (https://getfoundry.sh).
  *   No .env vars needed — Anvil's built-in funded test accounts are used.
