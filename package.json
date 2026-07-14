@@ -24,6 +24,8 @@
   },
   "scripts": {
     "e2e": "node test/e2e/e2e-zen-staker.js",
-    "e2e:anvil": "node test/e2e/e2e-zen-staker.js --anvil"
+    "e2e:anvil": "node test/e2e/e2e-zen-staker.js --anvil",
+    "e2e:additional-tests": "node test/e2e/e2e-zen-staker-additional-tests.js",
+    "e2e:additional-tests:anvil": "node test/e2e/e2e-zen-staker-additional-tests.js --anvil"
   }
 }
