@@ -29,7 +29,7 @@ fi
 : "${PRIVATE_KEY:?PRIVATE_KEY must be set}"
 
 RPC_ALIAS="${RPC_ALIAS:-mainnet}"
-POLL_INTERVAL="${POLL_INTERVAL:-20}"
+POLL_INTERVAL="${POLL_INTERVAL:-2}"
 
 while true; do
   next_reward_time=$(cast call "$REWARD_ACCUMULATOR_ADDRESS" "nextRewardTime()(uint256)" \
